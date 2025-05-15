@@ -4,14 +4,14 @@ const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const admin = require("firebase-admin");
 
 // Load environment variables
 dotenv.config();
 
-// Initialize Firebase Admin with service account from env
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, '\n'));
+// Initialize Firebase Admin
+const serviceAccount = require("../serviceAccountKey.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -19,13 +19,21 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// Express app setup
 const app = express();
 const port = process.env.PORT || 8080;
 
-app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Content-Type"] }));
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+app.options("*", cors());
 app.use(bodyParser.json());
 
-// Email transporter setup
+// Email transporter
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -34,7 +42,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Function to generate a 6-digit OTP
+// Generate 6-digit OTP
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -43,54 +51,50 @@ function generateOTP() {
 app.post("/api/send-otp", async (req, res) => {
   const { email } = req.body;
 
-  if (!email) return res.status(400).json({ success: false, message: "Email is required" });
-
-  const otp = generateOTP();
-  const hashedOTP = await bcrypt.hash(otp, 10);
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Your OTP Code",
-    text: `Your OTP verification code is: ${otp}`,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    await db.collection("otpVerifications").doc(email).set({
-      hashedOTP,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    res.status(200).json({ success: true, message: "OTP sent" });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.toString() });
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
   }
-});
-
-// Verify OTP endpoint
-app.post("/api/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
-
-  if (!email || !otp) return res.status(400).json({ success: false, message: "Email and OTP are required" });
 
   try {
-    const doc = await db.collection("otpVerifications").doc(email).get();
-    if (!doc.exists) return res.status(400).json({ success: false, message: "No OTP found" });
+    const userRef = db.collection("users").doc(email);
+    const userDoc = await userRef.get();
 
-    const { hashedOTP } = doc.data();
-    const isValid = await bcrypt.compare(otp, hashedOTP);
-
-    if (isValid) {
-      // Nullify OTP after successful verification
-      await db.collection("otpVerifications").doc(email).set({ hashedOTP: null }, { merge: true });
-
-      return res.status(200).json({ success: true, message: "OTP verified" });
-    } else {
-      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    // Check if user already verified
+    if (userDoc.exists && userDoc.data().emailVerified === true) {
+      return res.status(200).json({
+        success: true,
+        message: "User already verified",
+        otp: null,
+      });
     }
+
+    const otp = generateOTP();
+    const hashedOTP = await bcrypt.hash(otp, 10);
+
+    // Email content
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your OTP Code",
+      text: `Your OTP verification code is: ${otp}`,
+    };
+
+    // Send OTP email
+    await transporter.sendMail(mailOptions);
+
+    // Store hashed OTP in Firestore
+    await userRef.set(
+      {
+        otp: hashedOTP,
+        otpTimestamp: admin.firestore.FieldValue.serverTimestamp(),
+        emailVerified: false,
+      },
+      { merge: true }
+    );
+
+    return res.status(200).json({ success: true, message: "OTP sent", otp }); // remove `otp` in production
   } catch (error) {
-    res.status(500).json({ success: false, message: error.toString() });
+    return res.status(500).json({ success: false, message: error.toString() });
   }
 });
 
