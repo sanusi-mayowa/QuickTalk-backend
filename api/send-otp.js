@@ -1,6 +1,7 @@
 const express = require("express");
-const nodemailer = require("nodemailer");
 const cors = require("cors");
+const bodyParser = require("body-parser");
+const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
 const admin = require("firebase-admin");
@@ -20,26 +21,30 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// CORS middleware - allow only your frontend origin
-app.use(
-  cors({
-    origin: "http://localhost:8081", // change to your frontend URL
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type"],
-    credentials: true, // enable if you use cookies or auth headers
-  })
-);
+// === CORS SETUP ===
+// Allow only your frontend origin (replace with your actual frontend URL)
+const allowedOrigins = ["http://localhost:8081", "https://your-frontend-domain.com"];
 
-// Explicitly handle OPTIONS preflight requests
-app.options("*", (req, res) => {
-  res.header("Access-Control-Allow-Origin", "http://localhost:8081");
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.sendStatus(204);
-});
+app.use(cors({
+  origin: function(origin, callback){
+    // allow requests with no origin (like curl or Postman)
+    if(!origin) return callback(null, true);
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+}));
 
-// Use express.json() to parse JSON request bodies
-app.use(express.json());
+// Handle preflight requests for all routes
+app.options("*", cors());
+
+// Use body parser
+app.use(bodyParser.json());
 
 // Email transporter setup
 const transporter = nodemailer.createTransport({
@@ -60,16 +65,13 @@ app.post("/api/send-otp", async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Email is required" });
+    return res.status(400).json({ success: false, message: "Email is required" });
   }
 
   try {
     const userRef = db.collection("users").doc(email);
     const userDoc = await userRef.get();
 
-    // If user exists and is verified, return otp:null
     if (userDoc.exists && userDoc.data().emailVerified === true) {
       return res.status(200).json({
         success: true,
@@ -101,8 +103,7 @@ app.post("/api/send-otp", async (req, res) => {
       { merge: true }
     );
 
-    // Return OTP only for testing; remove in production
-    return res.status(200).json({ success: true, message: "OTP sent", otp });
+    return res.status(200).json({ success: true, message: "OTP sent", otp }); // Remove otp in production
   } catch (error) {
     console.error("Error in /api/send-otp:", error);
     return res.status(500).json({ success: false, message: error.toString() });
