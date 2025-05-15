@@ -1,74 +1,62 @@
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const nodemailer = require("nodemailer");
-const dotenv = require("dotenv");
-const bcrypt = require("bcryptjs");
-const admin = require("firebase-admin");
+import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
+import admin from "firebase-admin";
+import Cors from "cors";
 
-// Load environment variables
-dotenv.config();
-
-const app = express();
-const port = process.env.PORT || 8080;
-
-// Parse Firebase service account from env
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+// Initialize CORS middleware
+const cors = Cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
 });
+
+// Helper to run middleware in Vercel function
+function runMiddleware(req, res, fn) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result) => {
+      if (result instanceof Error) reject(result);
+      else resolve(result);
+    });
+  });
+}
+
+// Initialize Firebase Admin once (cache in Lambda environment)
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 const db = admin.firestore();
-
-// === CORS SETUP ===
-// Allow only your frontend origin (replace with your actual frontend URL)
-const allowedOrigins = ["http://localhost:8081", "https://your-frontend-domain.com"];
-
-app.use(cors({
-  origin: function(origin, callback){
-    // allow requests with no origin (like curl or Postman)
-    if(!origin) return callback(null, true);
-    if(allowedOrigins.indexOf(origin) === -1){
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-}));
-
-// Handle preflight requests for all routes
-app.options("*", cors());
-
-// Use body parser
-app.use(bodyParser.json());
-
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // Generate 6-digit OTP
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Send OTP endpoint
-app.post("/api/send-otp", async (req, res) => {
-  const { email } = req.body;
+export default async function handler(req, res) {
+  await runMiddleware(req, res, cors); // Run CORS for every request
 
+  if (req.method !== "POST") {
+    return res.status(405).json({ success: false, message: "Method not allowed" });
+  }
+
+  const { email } = req.body;
   if (!email) {
     return res.status(400).json({ success: false, message: "Email is required" });
   }
 
   try {
+    // Nodemailer transporter setup
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
     const userRef = db.collection("users").doc(email);
     const userDoc = await userRef.get();
 
@@ -103,14 +91,10 @@ app.post("/api/send-otp", async (req, res) => {
       { merge: true }
     );
 
-    return res.status(200).json({ success: true, message: "OTP sent", otp }); // Remove otp in production
+    // Return OTP only for dev/testing — remove in prod
+    return res.status(200).json({ success: true, message: "OTP sent", otp });
   } catch (error) {
-    console.error("Error in /api/send-otp:", error);
+    console.error("Error in send-otp:", error);
     return res.status(500).json({ success: false, message: error.toString() });
   }
-});
-
-// Start server
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+}
