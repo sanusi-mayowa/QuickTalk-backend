@@ -1,6 +1,5 @@
 const express = require("express");
 const nodemailer = require("nodemailer");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
@@ -21,15 +20,26 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// CORS middleware - allow only your frontend origin
 app.use(
   cors({
-    origin: "*",
+    origin: "http://localhost:8081", // change to your frontend URL
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type"],
+    credentials: true, // enable if you use cookies or auth headers
   })
 );
-app.options("*", cors());
-app.use(bodyParser.json());
+
+// Explicitly handle OPTIONS preflight requests
+app.options("*", (req, res) => {
+  res.header("Access-Control-Allow-Origin", "http://localhost:8081");
+  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.sendStatus(204);
+});
+
+// Use express.json() to parse JSON request bodies
+app.use(express.json());
 
 // Email transporter setup
 const transporter = nodemailer.createTransport({
@@ -50,7 +60,9 @@ app.post("/api/send-otp", async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
-    return res.status(400).json({ success: false, message: "Email is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Email is required" });
   }
 
   try {
@@ -89,7 +101,8 @@ app.post("/api/send-otp", async (req, res) => {
       { merge: true }
     );
 
-    return res.status(200).json({ success: true, message: "OTP sent", otp }); // remove `otp` in prod
+    // Return OTP only for testing; remove in production
+    return res.status(200).json({ success: true, message: "OTP sent", otp });
   } catch (error) {
     console.error("Error in /api/send-otp:", error);
     return res.status(500).json({ success: false, message: error.toString() });
