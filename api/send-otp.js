@@ -1,4 +1,3 @@
-// Required modules
 const express = require("express");
 const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
@@ -10,18 +9,17 @@ const admin = require("firebase-admin");
 // Load environment variables
 dotenv.config();
 
-// Initialize Firebase Admin
-const serviceAccount = require("../serviceAccountKey.json");
+const app = express();
+const port = process.env.PORT || 8080;
+
+// Parse Firebase service account from env
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
-
-// Express app setup
-const app = express();
-const port = process.env.PORT || 8080;
 
 app.use(
   cors({
@@ -33,7 +31,7 @@ app.use(
 app.options("*", cors());
 app.use(bodyParser.json());
 
-// Email transporter
+// Email transporter setup
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -59,7 +57,7 @@ app.post("/api/send-otp", async (req, res) => {
     const userRef = db.collection("users").doc(email);
     const userDoc = await userRef.get();
 
-    // Check if user already verified
+    // If user exists and is verified, return otp:null
     if (userDoc.exists && userDoc.data().emailVerified === true) {
       return res.status(200).json({
         success: true,
@@ -71,7 +69,7 @@ app.post("/api/send-otp", async (req, res) => {
     const otp = generateOTP();
     const hashedOTP = await bcrypt.hash(otp, 10);
 
-    // Email content
+    // Send OTP email
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
@@ -79,10 +77,9 @@ app.post("/api/send-otp", async (req, res) => {
       text: `Your OTP verification code is: ${otp}`,
     };
 
-    // Send OTP email
     await transporter.sendMail(mailOptions);
 
-    // Store hashed OTP in Firestore
+    // Save hashed OTP + timestamp + set emailVerified false
     await userRef.set(
       {
         otp: hashedOTP,
@@ -92,8 +89,9 @@ app.post("/api/send-otp", async (req, res) => {
       { merge: true }
     );
 
-    return res.status(200).json({ success: true, message: "OTP sent", otp }); // remove `otp` in production
+    return res.status(200).json({ success: true, message: "OTP sent", otp }); // remove `otp` in prod
   } catch (error) {
+    console.error("Error in /api/send-otp:", error);
     return res.status(500).json({ success: false, message: error.toString() });
   }
 });
