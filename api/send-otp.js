@@ -47,9 +47,9 @@ app.post("/api/send-otp", async (req, res) => {
   const otp = generateOTP();
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"QuickTalk" <no-reply@quicktalk.com>`
     to: email,
-    subject: "Your OTP Code - QuickTalk",
+    subject: "Your OTP Code",
     text: `Your OTP verification code is: ${otp}`,
   };
 
