@@ -19,6 +19,7 @@
   "homepage": "https://github.com/sanusi-mayowa/QuickTalk-backend#readme",
   "description": "",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
