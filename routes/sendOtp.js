@@ -66,12 +66,30 @@ router.post('/send-otp', async (req, res) => {
 
     // Send email
     await transporter.sendMail({
-      from: `"QuickTalk" <${process.env.MAIL_USER}>`,
-      // from: process.env.GMAIL_USER,
+      from: `"QuickTalk" <${process.env.GMAIL_USER}>`,
       to: email,
-      subject: 'Your OTP Verification Code',
-      html: `<p>Your OTP is: <b>${otp}</b></p>`,
+      subject: 'Email verification',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee;">
+          <div style="padding: 20px; background-color: #f9f9f9;">
+            <h2 style="color: #1a1a1a;">Email verification</h2>
+            <p>Hi,</p>
+            <p>You now need to verify your email address.</p>
+            <p>Please enter <strong style="font-size: 18px;">${otp}</strong> when prompted on the app.</p>
+            <p style="color: #666;">This verification code will expire after 5 minutes.</p>
+            <p>Kind regards,</p>
+            <p><strong>QuickTalk</strong></p>
+          </div>
+          <div style="background: #3A805B); height: 10px;"></div>
+          <div style="padding: 15px; font-size: 12px; color: #555; text-align: center;">
+            <p>This email was sent to you because you registered for a QuickTalk account or changed your email.</p>
+            <p>If this wasn’t you, please <a href="mailto:support@quicktalk.com">contact QuickTalk</a>. Do not reply to this email.</p>
+            <p>Sender: QuickTalk, 123 Innovation Drive, Tech City</p>
+          </div>
+        </div>
+      `,
     });
+
 
     res.status(200).json({ message: 'OTP sent successfully' });
   } catch (error) {
