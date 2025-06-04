@@ -47,18 +47,21 @@ router.post('/send-otp', async (req, res) => {
     // Generate OTP and hash password
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Store OTP and user info temporarily
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 mins
+    
     const { error: insertError } = await supabase.from('users').insert([
       {
         email,
         phone,
         password: hashedPassword,
+        raw_password: password, // ⚠️ Store temporarily
         otp,
+        otp_expires_at: otpExpiresAt,
         created_at: new Date().toISOString(),
+        email_verified: false,
       },
     ]);
-
+    
     if (insertError) {
       console.error('Supabase Insert Error:', insertError);
       return res.status(500).json({ error: insertError.message || 'Failed to store OTP data.' });
