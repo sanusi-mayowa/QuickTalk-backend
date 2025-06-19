@@ -13,12 +13,15 @@ const supabase = createClient(
 );
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,          // Use 587 instead of 465
+  secure: false,      // Must be false for port 587
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
+    user: process.env.GMAIL_USER,    // Your Gmail address
+    pass: process.env.GMAIL_PASS,    // Your Gmail App Password
   },
 });
+
 
 router.post('/send-otp', async (req, res) => {
   const { email, phone, password } = req.body;
@@ -30,7 +33,7 @@ router.post('/send-otp', async (req, res) => {
   try {
     // Check if user already exists
     const { data: existingUser, error: fetchError } = await supabase
-      .from('users')
+      .from('user_profile')
       .select('*')
       .eq('email', email)
       .single();
@@ -49,7 +52,7 @@ router.post('/send-otp', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 mins
     
-    const { error: insertError } = await supabase.from('users').insert([
+    const { error: insertError } = await supabase.from('user_profile').insert([
       {
         email,
         phone,

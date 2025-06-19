@@ -1,5 +1,7 @@
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const router = express.Router();
 
@@ -16,15 +18,18 @@ router.post('/verify-otp', async (req, res) => {
   }
 
   try {
-    // Step 1: Fetch user with raw_password
+    console.log('Verifying OTP for:', email);
+
+    // Step 1: Fetch user
     const { data: user, error, status } = await supabase
-      .from('users')
+      .from('user_profile')
       .select('otp, raw_password, otp_expires_at, email_verified')
       .eq('email', email)
       .single();
 
     if (error && status !== 406) {
-      return res.status(500).json({ error: 'Database error' });
+      console.error('Supabase query error:', error);
+      return res.status(500).json({ error: 'Failed to fetch user', details: error.message });
     }
 
     if (!user) {
@@ -40,37 +45,34 @@ router.post('/verify-otp', async (req, res) => {
       return res.status(401).json({ error: 'Invalid OTP' });
     }
 
-    // Step 3: Check if OTP is expired
-    if (!user.otp_expires_at || new Date() > new Date(user.otp_expires_at)) {
-      return res.status(401).json({ error: 'OTP has expired' });
-    }
 
-    const rawPassword = user.raw_password; // Save to return after cleanup
+    const rawPassword = user.raw_password;
 
-    // Step 4: Update email_verified and clean up fields (including raw_password)
+    // Step 4: Update verification and clean sensitive fields
     const { error: updateError } = await supabase
-      .from('users')
+      .from('user_profile')
       .update({
         email_verified: true,
         otp: null,
         otp_expires_at: null,
-        raw_password: null,  // <-- delete raw_password immediately
+        raw_password: null
       })
       .eq('email', email);
 
     if (updateError) {
+      console.error('Failed to update user verification:', updateError);
       return res.status(500).json({ error: 'Failed to update verification status' });
     }
 
-    // Step 5: Return raw_password to frontend
+    // Step 5: Return password to frontend
     return res.status(200).json({
-      message: 'OTP verified',
-      password: rawPassword,
+      message: 'OTP verified successfully',
+      password: rawPassword
     });
 
   } catch (err) {
-    console.error('Error verifying OTP:', err);
-    return res.status(500).json({ error: 'Server error' });
+    console.error('Server error during OTP verification:', err);
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
