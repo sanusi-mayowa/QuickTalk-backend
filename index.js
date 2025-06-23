@@ -9,8 +9,12 @@ import verifyOtpRoute from './routes/verifyOtp.js';
 
 
 const app = express();
+app.use(cors({
+  origin: 'http://localhost:8081',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-app.use(cors());
 app.use(express.json());
 
 app.use('/api', sendOtpRoute);
