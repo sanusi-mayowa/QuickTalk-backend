@@ -12,8 +12,18 @@ const supabase = createClient(
 );
 
 // Configure nodemailer
+// const transporter = nodemailer.createTransport({
+//   service: 'gmail',
+//   auth: {
+//     user: process.env.GMAIL_USER,
+//     pass: process.env.GMAIL_PASS,
+//   },
+// });
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587, // try this instead of 465
+  secure: false, // use TLS
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS,
@@ -87,7 +97,7 @@ router.post('/send-otp', async (req, res) => {
 
     // Send OTP via email
     const mailOptions = {
-      from: `"QuickTalk" <${process.env.EMAIL_USER}>`,
+      from: `"QuickTalk" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'QuickTalk - Email Verification',
       html: `
@@ -178,7 +188,7 @@ router.post('/resend-otp', async (req, res) => {
 
     // Send new OTP via email
     const mailOptions = {
-      from: `"QuickTalk" <${process.env.EMAIL_USER}>`,
+      from: `"QuickTalk" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'QuickTalk - New Verification Code',
       html: `
