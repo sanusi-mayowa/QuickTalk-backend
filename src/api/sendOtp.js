@@ -12,18 +12,10 @@ const supabase = createClient(
 );
 
 // Configure nodemailer
-// const transporter = nodemailer.createTransport({
-//   service: 'gmail',
-//   auth: {
-//     user: process.env.GMAIL_USER,
-//     pass: process.env.GMAIL_PASS,
-//   },
-// });
-
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 587, // try this instead of 465
-  secure: false, // use TLS
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_PASS,
