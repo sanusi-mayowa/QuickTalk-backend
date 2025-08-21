@@ -1,13 +1,16 @@
-const express = require("express");
+import express from "express";
+import { firestore } from "../utils/firebase.js";
+import { transporter, generateOTP } from "../utils/mailer.js";
+
 const router = express.Router();
-const { firestore } = require("../utils/firebase");
-const { transporter, generateOTP } = require("../utils/mailer");
 
 // POST /signup
 router.post("/", async (req, res) => {
     try {
         const { email, password, phone } = req.body;
-        if (!email || !password || !phone) return res.status(400).json({ success: false, message: "All fields required" });
+        if (!email || !password || !phone) {
+            return res.status(400).json({ success: false, message: "All fields required" });
+        }
 
         const usersRef = firestore.collection("users_profile");
         const emailExists = await usersRef.where("email", "==", email).get();
@@ -30,13 +33,13 @@ router.post("/", async (req, res) => {
             to: email,
             subject: "Your QuickTalk OTP Code",
             html: `
-        <div style="text-align:center; font-family:Arial;">
-          <h2 style="color:#3A805B;">QuickTalk OTP Verification</h2>
-          <p>Your OTP code is:</p>
-          <h1 style="color:#3A805B;">${otp}</h1>
-          <p>Expires in 10 minutes</p>
-        </div>
-      `,
+                <div style="text-align:center; font-family:Arial;">
+                  <h2 style="color:#3A805B;">QuickTalk OTP Verification</h2>
+                  <p>Your OTP code is:</p>
+                  <h1 style="color:#3A805B;">${otp}</h1>
+                  <p>Expires in 10 minutes</p>
+                </div>
+            `,
         });
 
         const docRef = await usersRef.add({
@@ -56,4 +59,4 @@ router.post("/", async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

@@ -1,5 +1,9 @@
-const admin = require("firebase-admin");
-require("dotenv").config();
+import admin from "firebase-admin";
+import "dotenv/config";
+
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  throw new Error("FIREBASE_SERVICE_ACCOUNT is not defined");
+}
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
@@ -10,4 +14,4 @@ admin.initializeApp({
 const firestore = admin.firestore();
 const auth = admin.auth();
 
-module.exports = { admin, firestore, auth };
+export { admin, firestore, auth };

@@ -1,10 +1,12 @@
-const express = require("express");
-const cors = require("cors");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
 
-const signupRoute = require("./routes/signup");
-const verifyOtpRoute = require("./routes/verifyOtp");
-const resendOtpRoute = require("./routes/resendOtp");
+import signupRoute from "./routes/signup.js";
+import verifyOtpRoute from "./routes/verifyOtp.js";
+import resendOtpRoute from "./routes/resendOtp.js";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -18,4 +20,6 @@ app.use("/verify-otp", verifyOtpRoute);
 app.use("/resend-otp", resendOtpRoute);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Server running on http://localhost:${PORT}`)
+);

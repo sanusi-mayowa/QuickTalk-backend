@@ -1,23 +1,34 @@
-const express = require("express");
+import express from "express";
+import { firestore, auth } from "../utils/firebase.js";
+
 const router = express.Router();
-const { firestore, auth } = require("../utils/firebase");
 
 // POST /verify-otp
 router.post("/", async (req, res) => {
     try {
         const { email, otp } = req.body;
-        if (!email || !otp) return res.status(400).json({ success: false, error: "Email and OTP required" });
+        if (!email || !otp) {
+            return res.status(400).json({ success: false, error: "Email and OTP required" });
+        }
 
         const usersRef = firestore.collection("users_profile");
         const snapshot = await usersRef.where("email", "==", email).get();
-        if (snapshot.empty) return res.status(404).json({ success: false, error: "User not found" });
+        if (snapshot.empty) {
+            return res.status(404).json({ success: false, error: "User not found" });
+        }
 
         const userDoc = snapshot.docs[0];
         const userData = userDoc.data();
 
-        if (!userData.otp || !userData.otpExpiresAt) return res.status(400).json({ success: false, error: "OTP already used or expired" });
-        if (new Date() > userData.otpExpiresAt.toDate()) return res.status(401).json({ success: false, error: "OTP has expired" });
-        if (userData.otp !== otp) return res.status(400).json({ success: false, error: "Invalid OTP" });
+        if (!userData.otp || !userData.otpExpiresAt) {
+            return res.status(400).json({ success: false, error: "OTP already used or expired" });
+        }
+        if (new Date() > userData.otpExpiresAt.toDate()) {
+            return res.status(401).json({ success: false, error: "OTP has expired" });
+        }
+        if (userData.otp !== otp) {
+            return res.status(400).json({ success: false, error: "Invalid OTP" });
+        }
 
         // Create Firebase Auth user
         const firebaseUser = await auth.createUser({
@@ -42,4 +53,4 @@ router.post("/", async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
